@@ -60,7 +60,7 @@ class TcOp : public Operator<Context> {
       setupDefaultGradMappingOptions();
     }
     executionEngine_ =
-        std::unique_ptr<tc::ExecutionEngine>(new tc::ExecutionEngine());
+        std::unique_ptr<tc::CudaExecutionEngine>(new tc::CudaExecutionEngine());
   }
 
   USE_OPERATOR_CONTEXT_FUNCTIONS;
@@ -132,7 +132,7 @@ class TcOp : public Operator<Context> {
   tc::MappingOptions gradMappingOptions_;
 
  private:
-  std::unique_ptr<tc::ExecutionEngine> executionEngine_;
+  std::unique_ptr<tc::CudaExecutionEngine> executionEngine_;
 };
 
 class GetTcOpGradient : public GradientMakerBase {
