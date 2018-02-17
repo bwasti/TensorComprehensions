@@ -26,6 +26,7 @@ target_link_libraries(tc_test INTERFACE ${GOOGLE_LIBS})
 set(BASIC_TEST_FILES
   test_basic
   test_basic_gpu
+  test_opencl
 )
 
 foreach(i ${BASIC_TEST_FILES})
@@ -35,6 +36,8 @@ endforeach()
 
 target_link_libraries(test_basic ${GOOGLE_LIBS} ${ISL_LIBRARIES} tc_aten)
 target_link_libraries(test_basic_gpu ${CUDA_LIBRARIES} ${CUDA_CUDA_LIBRARIES} ${CUDA_NVRTC_LIBRARIES} ${GOOGLE_LIBS} )
+target_link_libraries(test_opencl ${GOOGLE_LIBS}
+${CUDA_TOOLKIT_ROOT_DIR}/lib64/libOpenCL.so tc_core tc_lang)
 
 ################################################################################
 # Core library only tests

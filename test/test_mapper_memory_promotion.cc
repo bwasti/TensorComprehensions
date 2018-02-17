@@ -17,7 +17,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-#include "tc/core/polyhedral/codegen_cuda.h"
+#include "tc/core/polyhedral/codegen_gpu.h"
 #include "tc/core/polyhedral/exceptions.h"
 #include "tc/core/polyhedral/mapped_scop.h"
 #include "tc/core/polyhedral/memory_promotion.h"

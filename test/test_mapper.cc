@@ -26,7 +26,7 @@
 #include "tc/core/constants.h"
 #include "tc/core/libraries.h"
 #include "tc/core/mapping_options.h"
-#include "tc/core/polyhedral/codegen_cuda.h"
+#include "tc/core/polyhedral/codegen_gpu.h"
 #include "tc/core/polyhedral/functional.h"
 #include "tc/core/polyhedral/mapped_scop.h"
 #include "tc/core/polyhedral/mapping_types.h"
@@ -82,7 +82,7 @@ struct PolyhedralMapperTest : public ::testing::Test {
 
     // Map to blocks (1 single block here)
     auto mscop = MappedScop::makeMappedScop(
-        std::move(scop), Grid{1}, Block{blockSizes[0], blockSizes[1]}, 0);
+        std::move(scop), Grid{1}, Block{blockSizes[0], blockSizes[1]}, 0, MappedScop::GPUType::CUDA);
     USING_MAPPING_SHORT_NAMES(BX, BY, BZ, TX, TY, TZ);
     auto band = mscop->map(root->child({0}), 0, BX);
     bandScale(band, tileSizes);
@@ -107,7 +107,7 @@ struct PolyhedralMapperTest : public ::testing::Test {
         std::move(scop),
         Grid{gridSizes[0], gridSizes[1]},
         Block{blockSizes[0], blockSizes[1]},
-        0);
+        0, MappedScop::GPUType::CUDA);
 
     // Map to blocks
     USING_MAPPING_SHORT_NAMES(BX, BY, BZ, TX, TY, TZ);

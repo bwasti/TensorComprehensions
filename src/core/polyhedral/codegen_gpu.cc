@@ -24,7 +24,7 @@
 #include "tc/core/halide2isl.h"
 #include "tc/core/islpp_wrap.h"
 #include "tc/core/libraries.h"
-#include "tc/core/polyhedral/codegen_cuda.h"
+#include "tc/core/polyhedral/codegen_gpu.h"
 #include "tc/core/polyhedral/mapping_types.h"
 #include "tc/core/polyhedral/memory_promotion.h"
 #include "tc/core/polyhedral/schedule_isl_conversion.h"
@@ -150,9 +150,10 @@ void emitArgs(stringstream& ss, const Scop& scop) {
 void emitKernelSignature(
     stringstream& ss,
     const std::string& specializedName,
-    const Scop& scop) {
+    const Scop& scop,
+    const MappedScop& mscop) {
   CHECK_NE(specializedName, "") << "name not provided";
-  ss << "__global__ void " << specializedName << "(";
+  ss << mscop.getGlobalStr() << " void " << specializedName << "(";
   emitArgs(ss, scop);
   ss << ") {" << endl;
 }
@@ -517,7 +518,7 @@ void AstPrinter::emitStmt(isl::ast_node node) {
     emitReductionUpdate(stmtId, statementContext);
     reductionUpdateNodeId_ = nodeId;
   } else if (context_.scop().isSyncId(stmtId)) {
-    context_.ss << "__syncthreads();" << std::endl;
+    context_.ss << context_.mappedScop.getSyncStr() << std::endl;
   } else if (
       stmtId.get_name() == kReadIdName || stmtId.get_name() == kWriteIdName) {
     emitCopyStmt(statementContext);
@@ -802,9 +803,9 @@ void emitDirectSubscripts(
 void emitThreadIdInit(stringstream& ss, const MappedScop& scop) {
   WS ws;
   ss << ws.tab();
-  ss << "int b0 = blockIdx.x; int b1 = blockIdx.y; int b2 = blockIdx.z;\n";
+  ss << scop.getGroupIdInit("b0", "b1", "b2");
   ss << ws.tab();
-  ss << "int t0 = threadIdx.x; int t1 = threadIdx.y; int t2 = threadIdx.z;\n";
+  ss << scop.getLocalIdInit("t0", "t1", "t2");
 }
 
 void emitTmpDecl(stringstream& ss, const Scop& scop) {
@@ -819,7 +820,7 @@ void emitTmpDecl(stringstream& ss, const Scop& scop) {
   }
 }
 
-void emitPromotedArrayViewsHalide(stringstream& ss, const Scop& scop) {
+void emitPromotedArrayViewsHalide(stringstream& ss, const Scop& scop, const MappedScop& mscop) {
   for (const auto& p : scop.promotedDecls()) {
     WS ws;
     ss << ws.tab();
@@ -836,7 +837,7 @@ void emitPromotedArrayViewsHalide(stringstream& ss, const Scop& scop) {
         t = i.type();
       }
     }
-    ss << "__shared__ " << t << " " << viewName;
+    ss << mscop.getSharedMemStr() << t << " " << viewName;
     for (auto s : p.second.sizes) {
       ss << "[" << s << "]";
     }
@@ -872,12 +873,12 @@ string emitCudaKernel(
   }
 
   stringstream ss;
-  emitKernelSignature(ss, specializedName, scop);
+  emitKernelSignature(ss, specializedName, scop, mscop);
   emitThreadIdInit(ss, mscop);
   emitTensorViews(ss, scop.halide.outputs, paramValues);
   emitTensorViews(ss, scop.halide.inputs, paramValues);
   emitTmpDecl(ss, scop);
-  emitPromotedArrayViewsHalide(ss, scop);
+  emitPromotedArrayViewsHalide(ss, scop, mscop);
   // TODO: improve support for C++ callbacks in isl bindings generator
   // see https://github.com/PollyLabs/isl/issues/24
   // This cannot be done via islpp_wrap because the callback is stored for
