@@ -24,7 +24,7 @@ add_library(
 
   utils/cuda_info.cc
 
-  polyhedral/codegen_cuda.cc
+  polyhedral/codegen_gpu.cc
   polyhedral/codegen_llvm.cc
   polyhedral/llvm_jit.cc
   polyhedral/mapped_scop.cc

@@ -26,7 +26,7 @@
 #include "tc/core/cuda.h"
 #include "tc/core/flags.h"
 #include "tc/core/libraries.h"
-#include "tc/core/polyhedral/codegen_cuda.h"
+#include "tc/core/polyhedral/codegen_gpu.h"
 #include "tc/core/polyhedral/exceptions.h"
 #include "tc/core/polyhedral/functional.h"
 #include "tc/core/polyhedral/mapping_types.h"
@@ -542,7 +542,7 @@ std::unique_ptr<MappedScop> makeSpecializedMappedScop(
   tc::Block block = mappedScop.numThreads;
   std::tie(grid, block) = tightenLaunchBounds(*scop, grid, block);
   auto res = MappedScop::makeMappedScop(
-      std::move(scop), grid, block, mappedScop.unroll);
+      std::move(scop), grid, block, mappedScop.unroll, mappedScop.getGPUType());
   res->insertMappingContext();
 
   LOG_IF(INFO, FLAGS_debug_tc_mapper)
@@ -553,6 +553,84 @@ std::unique_ptr<MappedScop> makeSpecializedMappedScop(
   return res;
 }
 } // namespace
+
+MappedScop::GPUType MappedScop::getGPUType() const {
+  return gpu_;
+}
+void MappedScop::setGPUType(GPUType gpu) {
+  LOG(ERROR) << "setting";
+  gpu_ = gpu;
+  switch(gpu_) {
+    case GPUType::CUDA:
+      LOG(ERROR) << "CUDA" << (unsigned long long)this;
+      return;
+    case GPUType::OPENCL:
+      LOG(ERROR) << "OPENCL" << (unsigned long long) this;
+      return;
+    default:
+      return;
+  }
+}
+
+std::string MappedScop::getGlobalStr() const {
+  switch(gpu_) {
+    case GPUType::CUDA:
+      LOG(ERROR) << "global CUDA" << (unsigned long long) this;
+      return "__global__";
+    case GPUType::OPENCL:
+      LOG(ERROR) << "global OPENCL" << (unsigned long long) this;
+      return "__global";
+    default:
+      return "";
+  }
+}
+
+std::string MappedScop::getSharedMemStr() const {
+  switch(gpu_) {
+    case GPUType::CUDA:
+      LOG(ERROR) << "shmem CUDA\n";
+      return "__shared__";
+    case GPUType::OPENCL:
+      LOG(ERROR) << "shmem OPENCL\n";
+      return "__local";
+    default:
+      return "";
+  }
+}
+
+std::string MappedScop::getSyncStr() const {
+  switch(gpu_) {
+    case GPUType::CUDA:
+      LOG(ERROR) << "sync CUDA\n";
+      return "__syncthreads();";
+    case GPUType::OPENCL:
+      LOG(ERROR) << "sync OPENCl\n";
+      return "barrier(CLK_LOCAL_MEM_FENCE);";
+    default:
+      return "";
+  }
+}
+
+std::string MappedScop::getLocalIdInit(std::string t0, std::string t1, std::string t2) const {
+  switch(gpu_) {
+    case GPUType::CUDA:
+      return "int " + t0 + " = threadIdx.x; int "+t1+" = threadIdx.y; int "+t2+" = threadIdx.z;\n";
+    case GPUType::OPENCL:
+      return "int " + t0 + " = get_local_id(0); int "+t1+" = get_local_id(1); int "+t2+" = get_local_id(2);\n";
+    default:
+      return "";
+  }
+}
+std::string MappedScop::getGroupIdInit(std::string b0, std::string b1, std::string b2) const {
+  switch(gpu_) {
+    case GPUType::CUDA:
+      return "int "+b0+" = blockIdx.x; int "+b1+" = blockIdx.y; int "+b2+" = blockIdx.z;\n";
+    case GPUType::OPENCL:
+      return "int "+b0+" = get_group_id(0); int "+b1+" = get_group_id(1); int "+b2+" = get_group_id(2);\n";
+    default:
+      return "";
+  }
+}
 
 // Before generating code, make a copy of the scop and insert
 // the globalParameterContext of the original scop as top-level
@@ -588,7 +666,8 @@ std::unique_ptr<MappedScop> MappedScop::makeWithOuterBlockInnerThreadStrategy(
       std::move(scopUPtr),
       ::tc::Grid(options.grid),
       ::tc::Block(options.block),
-      options.proto.unroll()));
+      options.proto.unroll(),
+      MappedScop::GPUType::CUDA));
   auto& scop = mappedScop->scop_;
 
   // 1a. Optionally specialize before scheduling...
