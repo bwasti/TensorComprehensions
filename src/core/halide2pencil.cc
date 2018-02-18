@@ -181,41 +181,6 @@ HalidePencilState toPencil(
     }
   }
 
-  // Update actual parameters integer values
-  pencilState.parameters.clear();
-  for (auto& p : halide.params) {
-    // halide.params contains all args to tc::def including tensors
-    // only filter params coming from tensor shapes
-    if (!p.second.is_buffer()) {
-      pencilState.parameters.push_back(pencilState.pvm.at(p.first));
-    }
-  }
-
-  // Update names: input, output, kernelName, parameterSignature,
-  // kernelSpecializedName
-  pencilState.inputNames.clear();
-  for (auto& i : halide.inputs) {
-    pencilState.inputNames.push_back(i.name());
-  }
-  pencilState.outputNames.clear();
-  for (auto& o : halide.outputs) {
-    pencilState.outputNames.push_back(o.name());
-  }
-  std::stringstream ss;
-  for (auto& p : halide.params) {
-    if (!p.second.is_buffer()) {
-      ss << "int " << p.first << ", ";
-    }
-  }
-  pencilState.parameterSignature = ss.str();
-  std::stringstream ss2;
-  pencilState.kernelName = kernelName;
-  ss2 << pencilState.kernelName;
-  for (int i : pencilState.parameters) {
-    ss2 << "_" << i;
-  }
-  pencilState.kernelSpecializedName = ss2.str();
-
   // instantiate parameters with runtime values and build output DLpack metadata
   std::map<std::string, Expr> substitutions;
   for (auto p : pencilState.pvm) {
@@ -243,35 +208,8 @@ HalidePencilState toPencil(
     outputsDLT.emplace_back(
         makeDLTensorWithSizes(ctx, fromHalideType(out.type()), sizes));
   }
-  std::vector<const DLTensor*> outputsRawPtr;
-  for (auto& p : outputsDLT) {
-    outputsRawPtr.push_back(p.get());
-  }
-
-  Stmt stmt = halide.stmt;
-  if (scheduleSpecialize) {
-    stmt = substitute(substitutions, stmt);
-    // Constant-fold following substitution
-    stmt = simplify(stmt);
-  }
-
-  // extract indirectAccesses from the HalideContextPencil. Their signature is
-  // different
-  std::unordered_set<std::string> indirectAccesses;
-  /*
-    TODO
-  for (auto i : HalideContextPencil::IndirectAccesses(vops)) {
-    indirectAccesses.insert(i->name);
-  }
-  */
-
-  auto body = tc::halide2Pencil(stmt);
 
   pencilState.outputsDLT = std::move(outputsDLT);
-  pencilState.signatureSourcePair = SignatureSourcePair{
-      C99Signature(pencilState, outputsRawPtr, inputsDLT, indirectAccesses),
-      CUDASignature(pencilState, outputsRawPtr, inputsDLT),
-      body};
 
   return pencilState;
 }
