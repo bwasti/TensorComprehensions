@@ -105,8 +105,8 @@ class CudaTcExecutor {
   }
 
  private:
-  HalidePencilState getHalidePencilState(
-      const std::vector<const DLTensor*>& inTensorPtrs);
+  std::pair<std::map<std::string, int>, std::vector<dlutils::DLTensorUPtr>>
+  getPvmAndOutputShapes(const std::vector<const DLTensor*>& inTensorPtrs);
 
   void compileWithPetPpcg();
   void compileWithTcMapper();

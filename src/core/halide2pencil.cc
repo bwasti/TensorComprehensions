@@ -28,106 +28,6 @@ using namespace dlutils;
 using namespace Halide;
 using namespace Halide::Internal;
 
-namespace {
-
-std::string C99TensorSignature(
-    std::string name,
-    const DLTensor* t,
-    const std::unordered_set<std::string>& indirectAccesses,
-    bool input = false) {
-  std::stringstream ss;
-  if (input) {
-    ss << "const ";
-  }
-  // An extra level of indirection allows to pass full array sizes to Ppcg and
-  // takes care of indirect memory accesses.
-  ss << toString(t->dtype) << " " << name;
-  if (indirectAccesses.count(name) > 0) {
-    ss << "[]";
-  }
-  ss << "[" << t->shape[0] << "]";
-  for (int ii = 0; ii < t->ndim - 1; ++ii) {
-    CHECK_LT(0, t->strides[ii + 1]);
-    CHECK_EQ(0, t->strides[ii] % t->strides[ii + 1])
-        << "Strides non-comformable with C99 array in " << t;
-    auto v = t->strides[ii] / t->strides[ii + 1];
-    ss << "[" << v << "]";
-  }
-  return ss.str();
-}
-
-std::string C99TensorSignatures(
-    const std::vector<const DLTensor*>& outs,
-    const std::vector<const DLTensor*>& ins,
-    const std::vector<std::string>& outputNames,
-    const std::vector<std::string>& inputNames,
-    const std::unordered_set<std::string>& indirectAccesses) {
-  std::stringstream ss;
-  for (size_t i = 0; i < outs.size(); ++i) {
-    if (i > 0)
-      ss << ", ";
-    ss << C99TensorSignature(outputNames[i], outs[i], indirectAccesses);
-  }
-  for (size_t i = 0; i < ins.size(); ++i) {
-    if (i > 0)
-      ss << ", ";
-    ss << C99TensorSignature(inputNames[i], ins[i], indirectAccesses, true);
-  }
-  return ss.str();
-}
-
-std::string CUDATensorSignatures(
-    const std::vector<const DLTensor*>& outs,
-    const std::vector<const DLTensor*>& ins,
-    const std::vector<std::string>& outputNames,
-    const std::vector<std::string>& inputNames) {
-  std::stringstream ss;
-  for (size_t i = 0; i < outs.size(); ++i) {
-    if (i > 0)
-      ss << ", ";
-    ss << toString(outs[i]->dtype) << "* __restrict__ " << outputNames[i];
-  }
-  for (size_t i = 0; i < ins.size(); ++i) {
-    if (i > 0)
-      ss << ", ";
-    ss << "const " << toString(ins[i]->dtype) << "* __restrict__ "
-       << inputNames[i];
-  }
-  return ss.str();
-}
-
-} // namespace
-
-// Different signatures are temporary, they should be removed in favor of
-// a DeviceTensor-style API that will be compatible with whatever tensor
-// library we end up using.
-std::string C99Signature(
-    const HalidePencilState& state,
-    const std::vector<const DLTensor*>& outputs,
-    const std::vector<const DLTensor*>& inputs,
-    const std::unordered_set<std::string>& indirectAccesses) {
-  CHECK_EQ(outputs.size(), state.outputNames.size());
-  CHECK_EQ(inputs.size(), state.inputNames.size());
-  auto res = state.parameterSignature +
-      C99TensorSignatures(
-                 outputs,
-                 inputs,
-                 state.outputNames,
-                 state.inputNames,
-                 indirectAccesses);
-  return res;
-}
-
-std::string CUDASignature(
-    const HalidePencilState& state,
-    const std::vector<const DLTensor*>& outputs,
-    const std::vector<const DLTensor*>& inputs) {
-  auto res = state.parameterSignature +
-      CUDATensorSignatures(
-                 outputs, inputs, state.outputNames, state.inputNames);
-  return res;
-}
-
 DLDataType fromHalideType(const Halide::Type& type) {
   // Hmm, these are suspiciously similar...
   DLDataType dtype;
@@ -137,12 +37,12 @@ DLDataType fromHalideType(const Halide::Type& type) {
   return dtype;
 }
 
-HalidePencilState toPencil(
+std::pair<std::map<std::string, int>, std::vector<DLTensorUPtr>> toPencil(
     const tc2halide::HalideComponents& halide,
     const std::vector<const DLTensor*>& inputsDLT,
     bool scheduleSpecialize,
     const std::string& kernelName) {
-  HalidePencilState pencilState;
+  std::map<std::string, int> pvm;
   CHECK_EQ(halide.inputs.size(), inputsDLT.size())
       << "Mismatched HalideIR and DLTensor number of inputs";
 
@@ -158,8 +58,8 @@ HalidePencilState toPencil(
       auto dim_exp_tree = param_type.dims()[d];
       // dims can either be symbolic 'D' or a literal constant '4'
       if (const Variable* v = extent.as<Variable>()) {
-        if (pencilState.pvm.count(v->name) > 0) {
-          int64_t prev = pencilState.pvm[v->name];
+        if (pvm.count(v->name) > 0) {
+          int64_t prev = pvm[v->name];
           if (prev != current_size) {
             throw lang::ErrorReport(dim_exp_tree)
                 << "Mismatched sizes for dimension " << v->name
@@ -167,7 +67,7 @@ HalidePencilState toPencil(
                 << current_size << " here";
           }
         } else {
-          pencilState.pvm[v->name] = current_size;
+          pvm[v->name] = current_size;
         }
       } else { // it was a constant
         const int64_t* c = as_const_int(extent);
@@ -183,7 +83,7 @@ HalidePencilState toPencil(
 
   // instantiate parameters with runtime values and build output DLpack metadata
   std::map<std::string, Expr> substitutions;
-  for (auto p : pencilState.pvm) {
+  for (auto p : pvm) {
     substitutions[p.first] = p.second;
   }
   DLContext ctx{kDLGPU, 0};
@@ -209,38 +109,7 @@ HalidePencilState toPencil(
         makeDLTensorWithSizes(ctx, fromHalideType(out.type()), sizes));
   }
 
-  pencilState.outputsDLT = std::move(outputsDLT);
-
-  return pencilState;
-}
-
-std::string KernelSpecializedName(const HalidePencilState& state) {
-  return state.kernelSpecializedName;
-}
-
-std::string GetKernelName(const HalidePencilState& state) {
-  return state.kernelName;
-}
-
-void SetKernelName(HalidePencilState& state, const std::string& name) {
-  state.kernelName = name;
-}
-
-std::vector<int> GetKernelParameters(const HalidePencilState& state) {
-  return state.parameters;
-}
-
-std::map<std::string, int> GetParameterValMap(const HalidePencilState& state) {
-  return state.pvm;
-}
-
-std::unordered_map<std::string, long> GetParameterValues(
-    const HalidePencilState& state) {
-  std::unordered_map<std::string, long> m;
-  for (const auto& p : state.pvm) {
-    m[p.first] = p.second;
-  }
-  return m;
+  return std::make_pair(pvm, std::move(outputsDLT));
 }
 
 std::string halide2Pencil(const Stmt& stmt) {
