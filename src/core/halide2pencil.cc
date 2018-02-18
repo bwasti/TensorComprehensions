@@ -37,11 +37,9 @@ DLDataType fromHalideType(const Halide::Type& type) {
   return dtype;
 }
 
-std::pair<std::map<std::string, int>, std::vector<DLTensorUPtr>> toPencil(
+std::map<std::string, int> computeParamValueMap(
     const tc2halide::HalideComponents& halide,
-    const std::vector<const DLTensor*>& inputsDLT,
-    bool scheduleSpecialize,
-    const std::string& kernelName) {
+    const std::vector<const DLTensor*>& inputsDLT) {
   std::map<std::string, int> pvm;
   CHECK_EQ(halide.inputs.size(), inputsDLT.size())
       << "Mismatched HalideIR and DLTensor number of inputs";
@@ -80,7 +78,13 @@ std::pair<std::map<std::string, int>, std::vector<DLTensorUPtr>> toPencil(
       }
     }
   }
+  return pvm;
+}
 
+std::vector<DLTensorUPtr> inferOutputTensorInfo(
+    const tc2halide::HalideComponents& halide,
+    const std::vector<const DLTensor*>& inputsDLT) {
+  auto pvm = computeParamValueMap(halide, inputsDLT);
   // instantiate parameters with runtime values and build output DLpack metadata
   std::map<std::string, Expr> substitutions;
   for (auto p : pvm) {
@@ -109,7 +113,7 @@ std::pair<std::map<std::string, int>, std::vector<DLTensorUPtr>> toPencil(
         makeDLTensorWithSizes(ctx, fromHalideType(out.type()), sizes));
   }
 
-  return std::make_pair(pvm, std::move(outputsDLT));
+  return outputsDLT;
 }
 
 std::string halide2Pencil(const Stmt& stmt) {

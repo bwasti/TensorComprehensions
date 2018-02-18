@@ -141,25 +141,11 @@ CudaTcExecutor::CudaTcExecutor(
   halideComponents_ = tc2halide::translate(ctx_, tcTree_);
   checkInputsCompliant(inputsInfo);
   execInfo_.inputsInfo = makeDLTensorVector(inputsInfo);
-  execInfo_.outputsInfo = std::get<1>(getPvmAndOutputShapes(inputsInfo));
+  execInfo_.outputsInfo = tc::inferOutputTensorInfo(halideComponents_, inputsInfo);
 }
 
 CudaTcExecutor::~CudaTcExecutor() {
   isl_ctx_free(ctx_.release());
-}
-
-std::pair<std::map<std::string, int>, std::vector<DLTensorUPtr>>
-CudaTcExecutor::getPvmAndOutputShapes(
-    const std::vector<const DLTensor*>& inTensorPtrs) {
-  // TODO: check if this is wrong, packed tensors may  have 0 strides stored
-  return toPencil(
-      halideComponents_,
-      inTensorPtrs,
-      // if execInfo_.options is nullptr then just don't specialize the code
-      (execInfo_.options
-           ? execInfo_.options->proto.fix_parameters_before_scheduling()
-           : false),
-      execInfo_.kernelName);
 }
 
 std::vector<const DLTensor*> CudaTcExecutor::inferOutputTensorInfo() {

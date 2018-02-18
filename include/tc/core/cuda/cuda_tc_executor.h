@@ -105,9 +105,6 @@ class CudaTcExecutor {
   }
 
  private:
-  std::pair<std::map<std::string, int>, std::vector<dlutils::DLTensorUPtr>>
-  getPvmAndOutputShapes(const std::vector<const DLTensor*>& inTensorPtrs);
-
   void compileWithPetPpcg();
   void compileWithTcMapper();
 
