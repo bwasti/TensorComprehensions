@@ -16,7 +16,7 @@
 #include "tc/core/cuda/cuda_tc_executor.h"
 
 #include "tc/core/compilation_cache.h"
-#include "tc/core/halide2pencil.h"
+#include "tc/core/halide_utils.h"
 #include "tc/core/mapping_options_cpp_printer.h"
 #include "tc/core/polyhedral/mapped_scop.h"
 #include "tc/core/tc2halide.h"
@@ -141,7 +141,8 @@ CudaTcExecutor::CudaTcExecutor(
   halideComponents_ = tc2halide::translate(ctx_, tcTree_);
   checkInputsCompliant(inputsInfo);
   execInfo_.inputsInfo = makeDLTensorVector(inputsInfo);
-  execInfo_.outputsInfo = tc::inferOutputTensorInfo(halideComponents_, inputsInfo);
+  execInfo_.outputsInfo =
+      tc::inferOutputTensorInfo(halideComponents_, inputsInfo);
 }
 
 CudaTcExecutor::~CudaTcExecutor() {

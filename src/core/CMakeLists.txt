@@ -18,7 +18,7 @@ add_library(
   tc2halide.cc
 
   halide2isl.cc
-  halide2pencil.cc
+  halide_utils.cc
 
   cuda/cuda_execution_engine.cc
   cuda/cuda_tc_executor.cc
