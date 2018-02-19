@@ -85,11 +85,11 @@ class CudaTcExecutor : public ::tc::TcExecutor {
       const std::vector<void*>& outputs) const;
 
   std::string getCudaSource() {
-    return execInfo_.cudaSource;
+    return cudaSource;
   }
 
   bool hasRTCFun() {
-    return execInfo_.rtcFun.get() != nullptr;
+    return rtcFun.get() != nullptr;
   }
 
   // It is necessary to clear the RTC manually because it can throw and we
@@ -98,7 +98,7 @@ class CudaTcExecutor : public ::tc::TcExecutor {
     if (!hasRTCFun()) {
       return;
     }
-    execInfo_.rtcFun->clear();
+    rtcFun->clear();
   }
 
   std::string kernelName() const {
@@ -110,12 +110,13 @@ class CudaTcExecutor : public ::tc::TcExecutor {
   void compileWithTcMapper();
 
  public:
-  Grid grid() const {
-    return execInfo_.grid;
-  }
-  Block block() const {
-    return execInfo_.block;
-  }
+  std::string kernelSpecializedName;
+  std::string cudaSource;
+  Grid grid{{0, 0, 0}};
+  Block block{{0, 0, 0}};
+
+ protected:
+  std::shared_ptr<CudaRTCFunction> rtcFun;
 };
 
 } // namespace tc
