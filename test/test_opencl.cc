@@ -17,6 +17,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
+<<<<<<< e8b5736f87272dbd103fdd6737d263f7905bb772
 #include <CL/cl.hpp>
 
 #include "tc/core/constants.h"
@@ -207,6 +208,9 @@ def fun(float(N, M) A, float(N, M) B) -> (C) {
 
   auto res = mscop->codegen(specializedName);
   LOG(ERROR) << get<0>(res);
+}
+
+TEST(OpenCL, Basic) {
 }
 
 int main(int argc, char** argv) {
