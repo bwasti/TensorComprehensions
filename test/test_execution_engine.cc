@@ -208,6 +208,10 @@ TEST_F(ATenCompilationUnitTest, Casts) {
   CHECK_EQ(r, 0);
 }
 
+TEST(OpenCLExecutor, Basic) {
+  auto
+}
+
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   ::gflags::ParseCommandLineFlags(&argc, &argv, true);

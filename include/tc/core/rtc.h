@@ -69,4 +69,35 @@ class CudaRTCFunction {
   bool cleared_;
 };
 
+class OpenCLRTCFunction {
+  OpenCLRTCFunction();
+
+ public:
+  ~OpenCLRTCFunction();
+
+  static std::shared_ptr<OpenCLRTCFunction> Compile(
+      const std::string& name,
+      const std::string& source);
+
+  // if profile is set it returns the kernel runtime
+  Duration Launch(
+      const std::array<size_t, 3>& grid,
+      const std::array<size_t, 3>& block,
+      unsigned int shared_mem,
+      cudaStream_t stream,
+      std::vector<int> params,
+      std::vector<void*> outputs,
+      std::vector<const void*> inputs,
+      bool profile = false) const;
+
+  void clear();
+
+ private:
+  //mutable std::unordered_map<size_t, CUmodule> perGpuModule_;
+  //mutable std::unordered_map<size_t, CUfunction> perGpuKernel_;
+  std::string specializedName;
+  //std::vector<char> nvrtc_ptx;
+  bool cleared_;
+};
+
 } // namespace tc

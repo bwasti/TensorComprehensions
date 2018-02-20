@@ -24,6 +24,8 @@ add_library(
 
   cuda/cuda_execution_engine.cc
   cuda/cuda_tc_executor.cc
+  #opencl/opencl_execution_engine.cc
+  opencl/opencl_tc_executor.cc
 
   utils/cuda_info.cc
 
