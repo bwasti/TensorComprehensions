@@ -36,6 +36,7 @@ namespace tc {
 namespace polyhedral {
 
 const static string kLoopIteratorDefaultPrefix = "c";
+using GPUType = MappedScop::GPUType;
 
 namespace {
 
@@ -109,36 +110,39 @@ vector<string> emitParams(const Scop& scop) {
 }
 
 // Returns number of names printed, i.e. tensors.size().
-string emitTypedTensorName(Halide::OutputImageParam t) {
+string emitTypedTensorName(Halide::OutputImageParam t, GPUType gpu) {
   stringstream ss;
+  if (gpu == GPUType::OPENCL) {
+    ss << "__global ";
+  }
   ss << t.type() << "* " << makePointerName(t.name());
   return ss.str();
 }
 
 vector<string> emitTypedTensorNames(
-    const vector<Halide::OutputImageParam>& tensors) {
+    const vector<Halide::OutputImageParam>& tensors, GPUType gpu) {
   vector<string> res;
   res.reserve(tensors.size());
   for (auto t : tensors) {
-    res.push_back(emitTypedTensorName(t));
+    res.push_back(emitTypedTensorName(t, gpu));
   }
   return res;
 }
 
-vector<string> emitTypedTensorNames(const vector<Halide::ImageParam>& tensors) {
+vector<string> emitTypedTensorNames(const vector<Halide::ImageParam>& tensors, GPUType gpu) {
   vector<string> res;
   res.reserve(tensors.size());
   for (auto t : tensors) {
-    res.push_back(emitTypedTensorName(t));
+    res.push_back(emitTypedTensorName(t, gpu));
   }
   return res;
 }
 
-void emitArgs(stringstream& ss, const Scop& scop) {
+void emitArgs(stringstream& ss, const Scop& scop, GPUType gpu) {
   // Order is: params, outs, ins
   auto sigVec = emitParams(scop);
-  sigVec = sigVec + emitTypedTensorNames(scop.halide.outputs);
-  sigVec = sigVec + emitTypedTensorNames(scop.halide.inputs);
+  sigVec = sigVec + emitTypedTensorNames(scop.halide.outputs, gpu);
+  sigVec = sigVec + emitTypedTensorNames(scop.halide.inputs, gpu);
   for (auto& s : sigVec) {
     ss << s;
     if (s != sigVec.back()) {
@@ -153,8 +157,12 @@ void emitKernelSignature(
     const Scop& scop,
     const MappedScop& mscop) {
   CHECK_NE(specializedName, "") << "name not provided";
-  ss << mscop.getGlobalStr() << " void " << specializedName << "(";
-  emitArgs(ss, scop);
+  ss << mscop.getGlobalStr() << " void ";
+  if (mscop.getGPUType() == GPUType::OPENCL) {
+    ss << "__kernel ";
+  }
+  ss << specializedName << "(";
+  emitArgs(ss, scop, mscop.getGPUType());
   ss << ") {" << endl;
 }
 
@@ -181,7 +189,8 @@ void emitKernelSignature(
 void emitTensorView(
     stringstream& ss,
     Halide::OutputImageParam p,
-    const map<string, Halide::Expr>& paramValues) {
+    const map<string, Halide::Expr>& paramValues,
+    GPUType gpu) {
   WS ws;
   stringstream ssViewType;
   for (int i = 1; i < p.dimensions(); ++i) { // Skip the outermost dimension
@@ -192,9 +201,16 @@ void emitTensorView(
     ssViewType << "[" << extent << "]";
   }
   ss << ws.tab();
+  if (gpu == GPUType::OPENCL) {
+    ss << "__global ";
+  }
   ss << p.type() << " (*" << p.name() << ")" << ssViewType.str();
   ss << " = ";
-  ss << "reinterpret_cast<" << p.type() << " (*)" << ssViewType.str() << ">";
+  if (gpu == GPUType::CUDA) {
+    ss << "reinterpret_cast<" << p.type() << " (*)" << ssViewType.str() << ">";
+  } else if (gpu == GPUType::OPENCL) {
+    ss << "(__global " << p.type() << " (*)" << ssViewType.str() << ")";
+  }
   ss << "(" << makePointerName(p.name()) << ")";
   ss << ";";
   ss << endl;
@@ -203,18 +219,20 @@ void emitTensorView(
 void emitTensorViews(
     stringstream& ss,
     const vector<Halide::OutputImageParam>& params,
-    const map<string, Halide::Expr>& paramValues) {
+    const map<string, Halide::Expr>& paramValues,
+    GPUType gpu) {
   for (auto p : params) {
-    emitTensorView(ss, p, paramValues);
+    emitTensorView(ss, p, paramValues, gpu);
   }
 }
 
 void emitTensorViews(
     stringstream& ss,
     const vector<Halide::ImageParam>& params,
-    const map<string, Halide::Expr>& paramValues) {
+    const map<string, Halide::Expr>& paramValues,
+    GPUType gpu) {
   for (auto p : params) {
-    emitTensorView(ss, p, paramValues);
+    emitTensorView(ss, p, paramValues, gpu);
   }
 }
 
@@ -875,8 +893,8 @@ string emitCudaKernel(
   stringstream ss;
   emitKernelSignature(ss, specializedName, scop, mscop);
   emitThreadIdInit(ss, mscop);
-  emitTensorViews(ss, scop.halide.outputs, paramValues);
-  emitTensorViews(ss, scop.halide.inputs, paramValues);
+  emitTensorViews(ss, scop.halide.outputs, paramValues, mscop.getGPUType());
+  emitTensorViews(ss, scop.halide.inputs, paramValues , mscop.getGPUType());
   emitTmpDecl(ss, scop);
   emitPromotedArrayViewsHalide(ss, scop, mscop);
   // TODO: improve support for C++ callbacks in isl bindings generator

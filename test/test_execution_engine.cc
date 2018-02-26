@@ -209,7 +209,6 @@ TEST_F(ATenCompilationUnitTest, Casts) {
 }
 
 TEST(OpenCLExecutor, Basic) {
-  auto
 }
 
 int main(int argc, char** argv) {

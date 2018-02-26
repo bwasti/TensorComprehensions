@@ -17,6 +17,8 @@
 #include <string>
 #include <vector>
 
+#include <assert.h>
+
 #include <cuda_runtime.h>
 #include <nvrtc.h>
 
@@ -203,4 +205,49 @@ Duration CudaRTCFunction::Launch(
   TC_CUDA_RUNTIMEAPI_ENFORCE(cudaEventDestroy(stop));
   return std::chrono::microseconds(static_cast<int64_t>(milliseconds * 1000));
 }
+
+OpenCLRTCFunction::OpenCLRTCFunction() {}
+
+OpenCLRTCFunction::~OpenCLRTCFunction() {}
+void OpenCLRTCFunction::clear() {}
+Duration OpenCLRTCFunction::Launch(
+      const std::array<size_t, 3>& grid,
+      const std::array<size_t, 3>& block,
+      unsigned int shared_mem,
+      cudaStream_t stream,
+      std::vector<int> params,
+      std::vector<void*> outputs,
+      std::vector<const void*> inputs,
+      bool profile) const {}
+std::shared_ptr<OpenCLRTCFunction> OpenCLRTCFunction::Compile(
+      const std::string& name,
+      const std::string& source) {
+
+  std::shared_ptr<OpenCLRTCFunction> res(new OpenCLRTCFunction());
+  res->specializedName = name;
+
+  std::vector<cl::Platform> all_platforms;
+  cl::Platform::get(&all_platforms);
+
+  cl::Platform default_platform=all_platforms[0];
+  LOG(INFO) << "Using platform: "<<default_platform.getInfo<CL_PLATFORM_NAME>()<<"\n";
+
+  std::vector<cl::Device> all_devices;
+  default_platform.getDevices(CL_DEVICE_TYPE_ALL, &all_devices);
+  cl::Device default_device=all_devices[1];
+  LOG(INFO) << "Using device: "<<default_device.getInfo<CL_DEVICE_NAME>()<<"\n";
+
+  cl::Context context{default_device};
+  cl::Program::Sources sources;
+  sources.push_back({source.c_str(), source.length()});
+
+  // Compile
+  res->program = cl::Program(context, sources);
+  auto err = res->program.build({default_device});
+  if (err != CL_SUCCESS) {
+    LOG(ERROR) << res->program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(default_device);
+  }
+  return res;
+}
+
 } // namespace tc

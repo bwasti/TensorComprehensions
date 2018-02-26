@@ -37,7 +37,7 @@ endforeach()
 target_link_libraries(test_basic ${GOOGLE_LIBS} ${ISL_LIBRARIES} tc_aten)
 target_link_libraries(test_basic_gpu ${CUDA_LIBRARIES} ${CUDA_CUDA_LIBRARIES} ${CUDA_NVRTC_LIBRARIES} ${GOOGLE_LIBS} )
 target_link_libraries(test_opencl ${GOOGLE_LIBS}
-${CUDA_TOOLKIT_ROOT_DIR}/lib64/libOpenCL.so tc_core tc_lang)
+${CUDA_TOOLKIT_ROOT_DIR}/lib64/libOpenCL.so tc_core tc_lang tc_aten)
 
 ################################################################################
 # Core library only tests

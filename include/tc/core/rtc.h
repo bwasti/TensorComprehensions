@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <cuda.h>
+#include <CL/cl.hpp>
 #include <driver_types.h> // cuda driver types
 
 #include "tc/core/utils/time.h"
@@ -92,10 +93,11 @@ class OpenCLRTCFunction {
 
   void clear();
 
+  std::string specializedName;
+  cl::Program program;
  private:
   //mutable std::unordered_map<size_t, CUmodule> perGpuModule_;
   //mutable std::unordered_map<size_t, CUfunction> perGpuKernel_;
-  std::string specializedName;
   //std::vector<char> nvrtc_ptx;
   bool cleared_;
 };

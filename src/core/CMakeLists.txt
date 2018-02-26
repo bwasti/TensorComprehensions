@@ -24,7 +24,7 @@ add_library(
 
   cuda/cuda_execution_engine.cc
   cuda/cuda_tc_executor.cc
-  #opencl/opencl_execution_engine.cc
+  opencl/opencl_execution_engine.cc
   opencl/opencl_tc_executor.cc
 
   utils/cuda_info.cc
@@ -56,6 +56,7 @@ target_link_libraries(
   ${CUDA_CUDA_LIBRARIES}
   ${CUDA_curand_LIBRARY}
   ${CUDA_LIBRARIES}
+  ${CUDA_TOOLKIT_ROOT_DIR}/lib64/libOpenCL.so
   ${CUDA_NVRTC_LIBRARIES}
   ${HALIDE_LIBRARIES}
   ${ISL_LIBRARIES}

@@ -642,14 +642,24 @@ std::tuple<std::string, tc::Grid, tc::Block> MappedScop::codegen(
   auto mappedScopForCodegen = makeSpecializedMappedScop(*this);
 
   std::stringstream code;
-  code << code::cpp::boundsAsTemplate << code::c::types << std::endl;
+  if (gpu_ == GPUType::CUDA) {
+    LOG(INFO) << "CUDA GENERATED (bounds)";
+    code << code::cpp::boundsAsTemplate << code::c::types << std::endl;
+  } else {
+    code << code::c::types << std::endl;
+  }
   if (mappedScopForCodegen->scop().treeSyncUpdateMap.size() != 0) {
     code << code::cuda::common;
     code << code::cuda::cubBlockReduce;
   }
-  code << "extern \"C\" {" << std::endl
-       << emitCudaKernel(specializedName, *mappedScopForCodegen) << "}"
-       << std::endl;
+  if (gpu_ == GPUType::CUDA) {
+    LOG(INFO) << "CUDA GENERATED (extren C)";
+    code << "extern \"C\" {" << std::endl
+      << emitCudaKernel(specializedName, *mappedScopForCodegen) << "}"
+      << std::endl;
+  } else {
+      code << emitCudaKernel(specializedName, *mappedScopForCodegen) << std::endl;
+  }
 
   return std::make_tuple(
       code.str(),

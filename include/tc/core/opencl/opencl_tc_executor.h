@@ -21,6 +21,36 @@
 
 namespace tc {
 
+template <typename T>
+class CLTensor {
+  public:
+   CLTensor(cl::Context& context, std::vector<int> dims, int access = CL_MEM_READ_WRITE) : context_(context) {
+     size_ = 1;
+     for (const auto& dim : dims) {
+       size_ *= dim;
+     }
+     buf_ = cl::Buffer(context, access, sizeof(T) * size_);
+   }
+   bool write(const T* data) {
+    std::vector<cl::Device> devs;
+    auto err = context_.getInfo(CL_CONTEXT_DEVICES, &devs);
+    if (err != CL_SUCCESS) { return false; }
+    cl::CommandQueue queue(context_, devs[0]);
+    queue.enqueueWriteBuffer(buf_, CL_TRUE, 0, sizeof(T) * size_, data);
+  }
+   bool read(T* data) {
+    std::vector<cl::Device> devs;
+    auto err = context_.getInfo(CL_CONTEXT_DEVICES, &devs);
+    if (err != CL_SUCCESS) { return false; }
+    cl::CommandQueue queue(context_, devs[0]);
+    queue.enqueueReadBuffer(buf_, CL_TRUE, 0, sizeof(T) * size_, data);
+  }
+  private:
+   size_t size_;
+   cl::Buffer buf_;
+   cl::Context& context_;
+};
+
 class OpenCLTcExecutor : public ::tc::TcExecutor {
  public:
   OpenCLTcExecutor(
